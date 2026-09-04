@@ -12,7 +12,7 @@ The goal is to understand what happens *inside* an LLM, not just use it as a bla
 
 The book breaks down the process into **3 main stages** :
 
-![Figure 2.1 — The three main stages of coding an LLM](assets/figure_2_1.png)
+![Figure 2.1 — The three main stages of coding an LLM](assets/Media.jpeg)
 
 > *Figure 2.1 — The three main stages of coding an LLM (source: Sebastian Raschka)*
 
