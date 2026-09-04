@@ -42,16 +42,89 @@ Starting from the bottom and going up:
 
 ---
 
+## The Problem
+
+Neural networks are mathematical functions — they only operate on numbers.
+Raw text is a sequence of characters: `"I HAD always thought Jack Gisburn rather a cheap genius..."`.
+There is no direct way to feed this string into a matrix multiplication or a gradient descent update.
+
+The challenge is: **how do you turn language into numbers in a way that preserves meaning?**
+A naive approach (e.g. mapping each character to its ASCII code) loses all structure and context.
+We need something smarter.
+
+---
+
+## The Intuition
+
+Think of a dictionary. Every word has a unique entry number.
+If you agree on the same dictionary with someone else, you can communicate using only numbers — and reconstruct the original message perfectly.
+
+That is exactly what a **tokenizer + vocabulary** does:
+- The tokenizer splits text into atomic units called **tokens** (words, subwords, punctuation)
+- The vocabulary assigns a unique integer **ID** to each token
+- The result is a sequence of integers the model can process mathematically
+
+But integers alone are still too rigid — the number `42` is not "close" to `43` in any meaningful linguistic sense.
+So we go one step further: each integer is mapped to a **dense vector** (token embedding), where similar tokens end up with similar vectors. This is where meaning begins to emerge.
+
+---
+
+## The Solution
+
+The data preparation pipeline solves the problem in three steps:
+
+**1. Tokenization**
+Split the raw text into tokens using a tokenizer (e.g. a simple whitespace/punctuation splitter, or a BPE tokenizer like GPT-2's).
+
+```python
+# Example: "This is an example." → ["This", "is", "an", "example", "."]
+```
+
+**2. Vocabulary mapping (Token IDs)**
+Build a vocabulary from the training corpus and map each token to a unique integer ID.
+
+```python
+# Example: {"This": 40134, "is": 2052, "an": 133, "example": 389, ".": 12}
+# → [40134, 2052, 133, 389, 12]
+```
+
+**3. Token Embeddings**
+Pass each token ID through an embedding layer that converts it into a dense floating-point vector.
+These vectors are *learned* during training — they are not fixed.
+
+```python
+# Each token ID → vector of size d_model (e.g. 768 dimensions for GPT-2 small)
+```
+
+---
+
+## Application
+
+In `tokenizer.py`, the first concrete step of this pipeline is implemented:
+
+```python
+# Download the training text
+urllib.request.urlretrieve(url, file_path)
+
+# Read and inspect the raw data
+with open(file_path, "r", encoding="utf-8") as f:
+    raw_text = f.read()
+
+print("Total number of character:", len(raw_text))  # → 20,479 characters
+print(raw_text[:99])
+# → "I HAD always thought Jack Gisburn rather a cheap genius--though a good fellow enough--so it was no"
+```
+
+**What this tells us:**
+- The dataset (*The Verdict* by Edith Wharton) contains **20,479 characters**
+- It is a short story — small enough to experiment with on a laptop, large enough to demonstrate the full pipeline
+- The next steps will tokenize this text, build a vocabulary, and convert it into token IDs ready for the model
+
+---
+
 ## Key Concepts
 
 - **Tokenization** — Splitting text into units (tokens) the model can work with. Tokens can be words, subwords, or individual characters depending on the tokenizer.
 - **Vocabulary** — A fixed mapping from tokens to integer IDs. GPT-2 uses a vocabulary of ~50,000 tokens.
 - **Token embeddings** — Dense vector representations of token IDs. These are *learned* during training, not fixed.
 - **Decoder-only Transformer** — The architecture used by GPT-style models. It processes tokens left-to-right and predicts the next token.
-
----
-
-## Why this matters
-
-Without a proper tokenization and embedding pipeline, the model has no way to process text.
-This stage is the **foundation** of the entire LLM — get it wrong and nothing downstream works correctly.
