@@ -122,6 +122,65 @@ print(raw_text[:99])
 
 ---
 
+## SimpleTokenizerV1 — Encode & Decode
+
+![Encode and Decode flow](../assets/tokenizer_enc_dec.png)
+
+> *Illustration of `tokenizer.encode(text)` (top) and `tokenizer.decode(ids)` (bottom)*
+
+The `SimpleTokenizerV1` class implements the two core operations of any tokenizer:
+
+### `encode(text)` — Text → Token IDs
+
+```python
+def encode(self, text):
+    preprocessed = re.split(pattern, text)
+    preprocessed = [item.strip() for item in preprocessed if item.strip()]
+    IDs = [self.str_to_int[item] for item in preprocessed]
+    return IDs
+```
+
+1. Split the input string into tokens using the regex pattern (whitespace + punctuation)
+2. Strip and filter empty tokens
+3. Map each token to its integer ID using `str_to_int` (the vocabulary)
+
+→ `"The brown dog"` becomes `[7, 0, 1, ...]`
+
+---
+
+### `decode(ids)` — Token IDs → Text
+
+```python
+def decode(self, ids):
+    text = " ".join([self.int_to_str[id] for id in ids])
+    text = re.sub(r'\s+([,.?!"()\'])', r'\1', text)
+    return text
+```
+
+1. Convert each ID back to its token using `int_to_str` (the **inverse vocabulary**)
+2. Join all tokens with spaces
+3. Clean up spaces before punctuation marks (e.g. `word ,` → `word,`)
+
+→ `[7, 0, 1, ...]` becomes `"The brown dog..."`
+
+---
+
+### The two vocabularies
+
+| Attribute | Type | Direction | Built from |
+|-----------|------|-----------|------------|
+| `self.str_to_int` | `dict` | token → ID | `vocab` passed at init |
+| `self.int_to_str` | `dict` | ID → token | inverted from `vocab` |
+
+The **inverse vocabulary** is created automatically in `__init__`:
+```python
+self.int_to_str = {i: s for s, i in vocab.items()}
+```
+
+This symmetry is what makes encode/decode perfectly reversible — as long as all tokens in the input exist in the vocabulary.
+
+---
+
 ## Key Concepts
 
 - **Tokenization** — Splitting text into units (tokens) the model can work with. Tokens can be words, subwords, or individual characters depending on the tokenizer.
