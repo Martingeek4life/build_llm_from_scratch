@@ -253,17 +253,6 @@ If one sequence is shorter than the others, `[PAD]` tokens are appended to fill 
 
 ---
 
-### What GPT actually uses
-
-> GPT models (GPT-2, GPT-3, GPT-4) take a different approach — simpler and more powerful:
-
-| Feature | Our SimpleTokenizerV2 | GPT |
-|---------|----------------------|-----|
-| OOV handling | `<|unk|>` token | No `<|unk|>` — uses **Byte Pair Encoding (BPE)** |
-| Document boundary | `<|endoftext>` | `<|endoftext|>` |
-| Padding | N/A | N/A (uses attention masks) |
-| Special tokens | `<|unk|>`, `<|endoftext>` | Only `<|endoftext|>` |
-
 **Why no `<|unk|>` in GPT?**
 GPT uses **Byte Pair Encoding (BPE)** as its tokenizer. BPE never encounters an unknown token because it can always fall back to encoding any character at the byte level — every possible input can be represented, even emojis or rare characters.
 
