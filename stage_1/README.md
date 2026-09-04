@@ -1,8 +1,5 @@
 # Stage 1 — Data Preparation & Sampling Pipeline
 
-> Chapter 2: Working with Text Data
-> *"Build a Large Language Model (From Scratch)"* — Sebastian Raschka
-
 ---
 
 ## Overview
@@ -181,9 +178,105 @@ This symmetry is what makes encode/decode perfectly reversible — as long as al
 
 ---
 
+## Special Tokens
+
+![Special tokens — how endoftext separates documents](../assets/special_tokens.png)
+
+> *The <|endoftext|> token is prepended to each subsequent text source when concatenating multiple independent documents into a single training corpus.*
+
+### Why special tokens?
+
+When building a tokenizer, two fundamental problems arise:
+
+**Problem 1 — Out-of-Vocabulary (OOV) words**
+If the model encounters a word not seen during training, the vocabulary has no ID for it → `KeyError`.
+
+**Problem 2 — Document boundaries**
+When training on multiple documents concatenated into one long sequence, the model needs to know where one document ends and another begins.
+
+Special tokens solve both problems by reserving dedicated slots in the vocabulary.
+
+---
+
+### Tokens implemented in SimpleTokenizerV2
+
+| Token | ID | Role |
+|-------|----|------|
+| `<|unk|>` | 1139 | Replaces any word not found in the vocabulary |
+| `<|endoftext>` | 1140 | Marks the boundary between two independent documents |
+
+```python
+# Adding special tokens to the vocabulary
+all_tokens.extend(["<|unk|>", "<|endoftext>"])
+vocab = {token: integer for integer, token in enumerate(all_tokens)}
+```
+
+In `encode()`, the special tokens are isolated **before** the regex split (to prevent punctuation splitting from breaking them apart), then unknown words are replaced with `<|unk|>`:
+
+```python
+# Step 1: isolate special tokens first — keep them intact
+parts = re.split(r'(<\|endoftext>|<\|unk\|>)', text)
+for part in parts:
+    if part in ('<|endoftext>', '<|unk|>'):
+        preprocessed.append(part)        # kept as-is
+    else:
+        tokens = re.split(pattern, part) # normal regex split on regular text
+        preprocessed.extend([t.strip() for t in tokens if t.strip()])
+
+# Step 2: replace remaining unknown words with <|unk|>
+preprocessed = [item if item in self.str_to_int else "<|unk|>" for item in preprocessed]
+```
+
+**Result:**
+
+- `Hello` → `<|unk|>` (not in *The Verdict* vocabulary)
+- `palace` → `<|unk|>` (not in *The Verdict* vocabulary)
+- `<|endoftext>` → preserved with its own ID `1140`
+
+---
+
+### Other special tokens used by researchers
+
+Different models and frameworks use different sets of special tokens depending on their architecture:
+
+| Token | Full name | Role |
+|-------|-----------|------|
+| `[BOS]` | Begin Of Sequence | Marks the start of a text sequence |
+| `[EOS]` | End Of Sequence | Marks the end of a text sequence |
+| `[PAD]` | Padding | Fills shorter sequences in a batch to match the longest one |
+| `<|unk|>` | Unknown | Replaces out-of-vocabulary tokens |
+| `<|endoftext|>` | End Of Text | Separates independent documents (used by GPT) |
+
+**Why `[PAD]`?**
+During training, LLMs process text in batches. All sequences in a batch must have the same length.
+If one sequence is shorter than the others, `[PAD]` tokens are appended to fill it up to the batch length.
+
+---
+
+### What GPT actually uses
+
+> GPT models (GPT-2, GPT-3, GPT-4) take a different approach — simpler and more powerful:
+
+| Feature | Our SimpleTokenizerV2 | GPT |
+|---------|----------------------|-----|
+| OOV handling | `<|unk|>` token | No `<|unk|>` — uses **Byte Pair Encoding (BPE)** |
+| Document boundary | `<|endoftext>` | `<|endoftext|>` |
+| Padding | N/A | N/A (uses attention masks) |
+| Special tokens | `<|unk|>`, `<|endoftext>` | Only `<|endoftext|>` |
+
+**Why no `<|unk|>` in GPT?**
+GPT uses **Byte Pair Encoding (BPE)** as its tokenizer. BPE never encounters an unknown token because it can always fall back to encoding any character at the byte level — every possible input can be represented, even emojis or rare characters.
+
+We will explore BPE in detail in the next section.
+
+---
+
 ## Key Concepts
 
 - **Tokenization** — Splitting text into units (tokens) the model can work with. Tokens can be words, subwords, or individual characters depending on the tokenizer.
-- **Vocabulary** — A fixed mapping from tokens to integer IDs. GPT-2 uses a vocabulary of ~50,000 tokens.
-- **Token embeddings** — Dense vector representations of token IDs. These are *learned* during training, not fixed.
-- **Decoder-only Transformer** — The architecture used by GPT-style models. It processes tokens left-to-right and predicts the next token.
+- **Vocabulary** — A fixed mapping from tokens to integer IDs. GPT-2 uses a vocabulary of ~50,257 tokens (50,000 BPE merges + 256 byte tokens + 1 special token).
+- **Special tokens** — Reserved vocabulary entries that carry structural meaning (`<|unk|>`, `<|endoftext|>`, `[PAD]`, etc.)
+- **Out-of-vocabulary (OOV)** — Words not present in the vocabulary. Simple tokenizers use `<|unk|>`; GPT uses BPE to avoid this entirely.
+- **Byte Pair Encoding (BPE)** — A subword tokenization algorithm that eliminates OOV by iteratively merging frequent character pairs. Used by GPT-2 and GPT-3. *(Covered next.)*
+- **Token embeddings** — Dense vector representations of token IDs, learned during training.
+- **Decoder-only Transformer** — The architecture used by GPT-style models.

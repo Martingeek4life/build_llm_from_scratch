@@ -85,3 +85,71 @@ text = " ".join(preprocessed[:99])  # join the list back into a string before en
 ids = tokenizer.encode(text)
 print(ids , "\n")
 print(tokenizer.decode(ids))
+
+# -------------------------------------------------------------------- #
+# PROBLEM with SimpleTokenizerV1:                                       #
+#                                                                       #
+# If we pass a text containing words NOT in the vocabulary, we get a   #
+# KeyError — those tokens have no associated ID.                        #
+#                                                                       #
+# Example: tokenizer.encode("Hello, world!")                            #
+#   → KeyError: 'Hello'  (not seen in "The Verdict")                   #
+#                                                                       #
+# SOLUTION → SimpleTokenizerV2 adds two special tokens:                #
+#   <|unk|>        : replaces any out-of-vocabulary token               #
+#   <|endoftext>   : marks the end of the text document dataset         #
+
+all_tokens = sorted(list(set(preprocessed)))
+all_tokens.extend(["<|unk|>", "<|endoftext>"])
+vocab = {token:interger for interger, token in enumerate(all_tokens)}
+print(len(vocab.items()))
+
+for i, item in enumerate(list(vocab.items())[-5:]):
+    print(item)
+
+# ----------------------------------------------------------------
+# Let write the SimpleTokenizerV2, that handle UNK and ENDOFTEXT        |
+# ----------------------------------------------------------------
+
+class SimpleTokenizerV2:
+    def __init__(self, vocab):
+        self.str_to_int = vocab
+        self.int_to_str = {i:s for s,i in vocab.items()}
+    
+    def encode(self, text):
+        # Step 1: split on special tokens FIRST to preserve them intact
+        # (if we apply the regex directly, <|endoftext> gets broken into
+        #  '<', '|', 'endoftext', '>' — none of which are in the vocab)
+        parts = re.split(r'(<\|endoftext>|<\|unk\|>)', text)
+
+        preprocessed = []
+        for part in parts:
+            if part in ('<|endoftext>', '<|unk|>'):
+                preprocessed.append(part)       # keep special token as-is
+            else:
+                # Step 2: apply normal regex split only on regular text
+                tokens = re.split(pattern, part)
+                preprocessed.extend([t.strip() for t in tokens if t.strip()])
+
+        # Step 3: replace any remaining unknown token with <|unk|>
+        preprocessed = [item if item in self.str_to_int else "<|unk|>" for item in preprocessed]
+        ids = [self.str_to_int[item] for item in preprocessed]
+        return ids
+    
+    def decode(self, ids):
+        text = " ".join([self.int_to_str[id] for id in ids])
+        text = re.sub(r'\s+([,.?!"()\'])', r'\1', text)
+        return text
+
+# let try this new tokenizer
+#-------------------------------------------------------------------
+
+text1 = "Hello, do you like tea ?"
+text2 = "In the sunlit terraces of the palace"
+text = "<|endoftext>".join((text1, text2))
+print(text)
+
+tokenizer = SimpleTokenizerV2(vocab)
+ids = tokenizer.encode(text)
+print(ids)
+print(tokenizer.decode(ids))
